@@ -2,7 +2,18 @@
 
 A desktop app that finds a player's standout moments ("scenes") in Diabotical demo files: windows of a few seconds in which one player dealt a lot of damage and/or scored several frags, optionally only those that end with the player's round-winning frag. It is a GUI for the `scene-finder` command of the dbt-netcode toolkit and produces the same results and the same text output.
 
+![Diabotical Demo Analyzer showing three scenes found across 934 demos](screenshot.png)
+
 Rust core + Tauri 2 shell, Vue 3 front end. Built for large collections: a folder of ~1000 demos (13 GB) scans in the time it takes to gunzip it in parallel, and extracted data is cached so every later run with different players or thresholds is instant.
+
+## Where to find your replays
+
+Diabotical writes replays to the following folders. Point the app at this folder (or drop it onto the window) to scan all of them:
+
+| Platform | Folder |
+|---|---|
+| Windows | `C:\Users\<you>\AppData\Roaming\Diabotical\Replays\` (paste `%APPDATA%\Diabotical\Replays` into Explorer) |
+| Linux (Heroic, Wine/Proton prefix) | `~/Games/Heroic/Prefixes/default/Diabotical/pfx/drive_c/users/steamuser/AppData/Roaming/Diabotical/Replays/` |
 
 ## Usage
 
