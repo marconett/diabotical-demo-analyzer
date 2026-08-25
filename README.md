@@ -1,10 +1,11 @@
 # Diabotical Demo Analyzer
 
-A desktop app that finds a player's standout moments ("scenes") in Diabotical demo files: windows of a few seconds in which one player dealt a lot of damage and/or scored several frags, optionally only those that end with the player's round-winning frag. It is a GUI for the `scene-finder` command of the dbt-netcode toolkit and produces the same results and the same text output.
+A desktop app that finds a player's standout moments ("scenes") in Diabotical demo files: windows of a few seconds in which one player dealt a lot of damage and/or scored several frags, optionally only those that end with the player's round-winning frag.
+
+Built for large collections: a folder of ~1000 demos (13 GB) scanned in ~5s on my NVME.\
+Extracted data is cached so every later run with different parameters is instant.
 
 ![Diabotical Demo Analyzer showing three scenes found across 934 demos](screenshot.png)
-
-Rust core + Tauri 2 shell, Vue 3 front end. Built for large collections: a folder of ~1000 demos (13 GB) scans in the time it takes to gunzip it in parallel, and extracted data is cached so every later run with different players or thresholds is instant.
 
 ## Where to find your replays
 
@@ -17,7 +18,7 @@ Diabotical writes replays to the following folders. Point the app at this folder
 
 ## Usage
 
-1. Pick a demo file (`.rbr` client recording, `.srd` server recording) or a folder with the buttons, or drop it anywhere onto the window. Folders are searched recursively.
+1. Pick a demo file (`.rbr` client recording, `.srd` server recording) or a folder, or drop it anywhere onto the window. Folders are searched recursively.
 2. The player list is filled from the start of every demo. Pick names from the suggestions or type any name (a player who joined mid-match may only show up after a full scan cached the demo).
 3. Set the criteria, exactly as on the command line:
    - **Min. damage** (`-dmg`) and **Min. frags** (`-frags`): thresholds within the window. At least one of them, or **Round win**, is required.
@@ -25,8 +26,6 @@ Diabotical writes replays to the following folders. Point the app at this folder
    - **Time window** (`-t`): window length in seconds; required with a damage or frag threshold.
    - **Round win** (`-win`): the scene must end with the player's round-winning frag (the round may close up to 1 s after the window). Alone, it lists every round-winning frag the player scored.
 4. Run. Results are grouped per demo; "Copy as text" copies the exact command-line output.
-
-Cache location: the app data directory (`~/Library/Application Support/de.marconett.dbt-fragfinder/extract-cache` on macOS). Entries are keyed by absolute path, size and modification time, so a changed file is rescanned automatically. "Clear cache" removes them.
 
 ## Building
 
@@ -46,7 +45,7 @@ cargo run --release -p scenefinder-core --features cli -- --discover ~/demos    
 cargo run --release -p scenefinder-core --features cli -- --bench --no-cache ~/demos -p x -dmg 1 -t 5
 ```
 
-Tests: `cargo test --workspace --features scenefinder-core/cli`. The golden tests compare against the reference tool's output on sample demos and are skipped when `../dbt-netcode/samples` (or `$SCENEFINDER_SAMPLES`) is absent.
+Tests: `cargo test --workspace --features scenefinder-core/cli`.
 
 ## How it works
 
@@ -58,7 +57,3 @@ Demos are processed in parallel across all cores, largest first. Cancelling stop
 
 - `.srd` server recordings are supported per the format description but have not been exercised against real files.
 - Output matches the reference Python implementation byte-for-byte on the sample demos, including its choice among equally good windows for round-winning scenes (which in Python follows set iteration order; the core reproduces that order).
-
-## License
-
-MIT
