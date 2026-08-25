@@ -25,7 +25,7 @@ Diabotical writes replays to the following folders. Point the app at this folder
    - **Combine** (`-c and|or`): whether both thresholds must hold (default) or either, only relevant when both are set.
    - **Time window** (`-t`): window length in seconds; required with a damage or frag threshold.
    - **Round win** (`-win`): the scene must end with the player's round-winning frag (the round may close up to 1 s after the window). Alone, it lists every round-winning frag the player scored.
-4. Run. Results are grouped per demo; "Copy as text" copies the exact command-line output.
+4. Run. Every scene is one row; "Copy command" puts a `/play <demo> <seconds>` line on the clipboard that, pasted into the Diabotical console, opens the demo 5 seconds before the scene.
 
 ## Building
 

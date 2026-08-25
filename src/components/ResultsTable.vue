@@ -1,88 +1,55 @@
 <template>
   <div class="results">
-    <div class="toolbar">
-      <code class="header-line">{{ report.headerLine }}</code>
-      <span class="spacer"></span>
-      <span class="summary">
-        {{ report.totalScenes }} scene{{ report.totalScenes === 1 ? '' : 's' }} across
-        {{ report.demosWithPlayer }}/{{ report.demoCount }} demo{{
-          report.demoCount === 1 ? '' : 's'
-        }}
-        <template v-if="report.cancelled"> · cancelled</template>
+    <div class="howto" role="note">
+      <span class="howto-icon" aria-hidden="true">▶</span>
+      <span>
+        <strong>Copy command</strong> puts a <code>/play</code> line on your clipboard; paste it
+        into the Diabotical console to open that demo 5 seconds before the scene.
       </span>
-      <button class="small" @click="copyText">{{ copied ? 'Copied' : 'Copy as text' }}</button>
-      <button class="small" @click="showText = !showText">
-        {{ showText ? 'Hide text' : 'Show text' }}
-      </button>
     </div>
 
-    <pre v-if="showText" class="text">{{ report.text }}</pre>
+    <div class="summary">
+      <strong> {{ report.totalScenes }} scene{{ report.totalScenes === 1 ? '' : 's' }} </strong>
+      across {{ report.demosWithPlayer }}/{{ report.demoCount }} demo{{
+        report.demoCount === 1 ? '' : 's'
+      }}
+      <template v-if="report.cancelled"> · cancelled</template>
+    </div>
 
-    <template v-else>
-      <section v-for="d in withScenes" :key="d.path" class="demo">
-        <div class="demo-head" :title="d.path">
-          <strong>{{ d.fileName }}</strong>
-          <span v-if="d.meta" class="meta">
-            {{ d.meta.gameMode }} · {{ d.meta.mapName }} · {{ d.meta.appVersion }}
-          </span>
-          <span class="spacer"></span>
-          <span class="count">{{ d.sceneCount }} scene{{ d.sceneCount === 1 ? '' : 's' }}</span>
-          <span v-if="d.stoppedEarly" class="tag warn">stopped early</span>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th class="num">Time</th>
-              <th>Player</th>
-              <th class="num">Damage</th>
-              <th class="num">Frags</th>
-              <th class="num">Round</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(s, i) in d.scenes" :key="i" :title="s.line">
-              <td class="num">
-                <code>{{ s.clock }}</code>
-              </td>
-              <td>{{ s.player }}</td>
-              <td class="num">{{ s.damage ?? '' }}</td>
-              <td class="num">{{ s.frags ?? '' }}</td>
-              <td class="num">
-                <template v-if="s.round !== null"
-                  >{{ s.round
-                  }}<span v-if="s.damage === null" class="muted"> (winning frag)</span></template
-                >
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <div v-if="d.missingPlayers.length" class="note">
-          No player named {{ d.missingPlayers.map(quote).join(', ') }} dealt damage or scored.
-          <span v-if="d.playersSeen.length">Players seen: {{ d.playersSeen.join(', ') }}</span>
-        </div>
-      </section>
+    <table v-if="rows.length">
+      <thead>
+        <tr>
+          <th class="action"></th>
+          <th>Demo</th>
+          <th class="num">Time</th>
+          <th>Mode</th>
+          <th>Map</th>
+          <th>Player</th>
+          <th class="num">Damage</th>
+          <th class="num">Frags</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="r in rows" :key="r.key" :title="r.command">
+          <td class="action">
+            <button class="small copy" :class="{ done: copiedKey === r.key }" @click="copy(r)">
+              {{ copiedKey === r.key ? 'Copied' : 'Copy command' }}
+            </button>
+          </td>
+          <td>{{ r.fileName }}</td>
+          <td class="num time">{{ r.time }}</td>
+          <td>{{ r.mode }}</td>
+          <td>{{ r.map }}</td>
+          <td>{{ r.player }}</td>
+          <td class="num">{{ r.damage ?? '' }}</td>
+          <td class="num">{{ r.frags ?? '' }}</td>
+        </tr>
+      </tbody>
+    </table>
 
-      <section v-if="withoutScenes.length" class="demo quiet">
-        <button class="disclosure" @click="showQuiet = !showQuiet">
-          {{ showQuiet ? '▾' : '▸' }} {{ withoutScenes.length }} demo{{
-            withoutScenes.length === 1 ? '' : 's'
-          }}
-          without scenes
-        </button>
-        <ul v-if="showQuiet">
-          <li v-for="d in withoutScenes" :key="d.path" :title="d.path">
-            <strong>{{ d.fileName }}</strong>
-            <span v-if="d.error" class="error"> {{ d.error }}</span>
-            <span v-else-if="d.sceneCount === null" class="muted">
-              no requested player active<template v-if="d.playersSeen.length">
-                (seen: {{ d.playersSeen.join(', ') }})</template
-              >
-            </span>
-            <span v-else class="muted"> no scene matched</span>
-          </li>
-        </ul>
-      </section>
-    </template>
+    <p v-if="withoutScenes" class="quiet">
+      {{ withoutScenes }} demo{{ withoutScenes === 1 ? '' : 's' }} without a scene
+    </p>
   </div>
 </template>
 
@@ -92,25 +59,56 @@ import type { RunReport } from '../lib/types';
 
 const props = defineProps<{ report: RunReport }>();
 
-const showText = ref(false);
-const showQuiet = ref(false);
-const copied = ref(false);
-
-const withScenes = computed(() => props.report.demos.filter((d) => (d.sceneCount ?? 0) > 0));
-const withoutScenes = computed(() => props.report.demos.filter((d) => (d.sceneCount ?? 0) === 0));
-
-function quote(s: string) {
-  return `'${s}'`;
+interface Row {
+  key: string;
+  command: string;
+  fileName: string;
+  time: string;
+  mode: string;
+  map: string;
+  player: string;
+  damage: number | null;
+  frags: number | null;
 }
 
-async function copyText() {
+// Seconds before the scene at which playback starts, so the run-up is visible.
+const LEAD_SECONDS = 5;
+
+const copiedKey = ref<string | null>(null);
+let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+
+const rows = computed<Row[]>(() =>
+  props.report.demos.flatMap((d) => {
+    const demoName = d.fileName.replace(/\.[^.]+$/, '');
+    return d.scenes.map((s, i) => ({
+      key: `${d.path}#${i}`,
+      command: `/play ${demoName} ${Math.max(0, Math.floor(s.start - LEAD_SECONDS))}`,
+      fileName: d.fileName,
+      time: s.clock.replace(/^\[|\]$/g, ''),
+      mode: d.meta?.gameMode ?? '',
+      map: d.meta?.mapName ?? '',
+      player: s.player,
+      damage: s.damage,
+      frags: s.frags,
+    }));
+  }),
+);
+
+const withoutScenes = computed(
+  () => props.report.demos.filter((d) => (d.sceneCount ?? 0) === 0).length,
+);
+
+async function copy(r: Row) {
   try {
-    await navigator.clipboard.writeText(props.report.text);
-    copied.value = true;
-    setTimeout(() => (copied.value = false), 1500);
+    await navigator.clipboard.writeText(r.command);
   } catch {
-    showText.value = true;
+    // The clipboard API is unavailable without a secure context; the command
+    // is still readable as the row's tooltip.
+    return;
   }
+  copiedKey.value = r.key;
+  clearTimeout(copiedTimer);
+  copiedTimer = setTimeout(() => (copiedKey.value = null), 1500);
 }
 </script>
 
@@ -118,149 +116,108 @@ async function copyText() {
 .results {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  font-size: 14.5px;
 }
 
-.toolbar {
+.howto {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--accentColor) 45%, var(--borderColor));
+  border-left: 4px solid var(--accentColor);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accentColor) 9%, var(--bgColor));
+  line-height: 1.45;
 }
 
-.header-line {
+.howto-icon {
+  color: var(--accentColor);
   font-size: 12px;
-  color: var(--mutedColor);
-  user-select: text;
+}
+
+.howto code {
+  padding: 0 4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accentColor) 14%, transparent);
 }
 
 .summary {
-  font-size: 12px;
-  color: var(--mutedColor);
-  white-space: nowrap;
-}
-
-.spacer {
-  flex: 1;
-}
-
-.text {
-  margin: 0;
-  padding: 10px 12px;
-  background: var(--chromeBg);
-  border: 1px solid var(--borderColor);
-  border-radius: 6px;
-  white-space: pre;
-  overflow: auto;
-  user-select: text;
-  cursor: text;
-}
-
-.demo {
-  border: 1px solid var(--borderColor);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.demo-head {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 5px 10px;
-  background: var(--chromeBg);
-  border-bottom: 1px solid var(--borderColor);
-  font-size: 12.5px;
-}
-
-.meta,
-.count,
-.muted {
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
   color: var(--mutedColor);
 }
 
-.tag {
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0 5px;
-  border: 1px solid var(--borderColor);
-  border-radius: 3px;
-  color: var(--mutedColor);
-}
-
-.tag.warn {
-  color: var(--warningColor);
-  border-color: var(--warningColor);
+.summary strong {
+  color: var(--fgColor);
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
 }
 
 th,
 td {
-  padding: 3px 10px;
+  padding: 6px 8px;
   text-align: left;
-  border-bottom: 1px solid color-mix(in srgb, var(--borderColor) 60%, transparent);
+  border-bottom: 1px solid var(--borderColor);
+  white-space: nowrap;
 }
 
 th {
-  font-size: 11px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bgColor);
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--mutedColor);
 }
 
-tbody tr:last-child td {
-  border-bottom: none;
+td {
+  user-select: text;
 }
 
 tbody tr:hover td {
   background: color-mix(in srgb, var(--shadeColor) 60%, transparent);
 }
 
+th.action,
+td.action {
+  width: 1px;
+  padding-left: 4px;
+}
+
 .num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.time {
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  color: var(--accentColor);
+}
+
+button.copy {
+  padding: 3px 10px;
+  font-size: 13px;
   white-space: nowrap;
 }
 
-td {
-  user-select: text;
-}
-
-.note {
-  padding: 5px 10px;
-  font-size: 12px;
-  color: var(--mutedColor);
-  border-top: 1px solid var(--borderColor);
+button.copy.done {
+  color: var(--successColor);
+  border-color: var(--successColor);
 }
 
 .quiet {
-  padding: 4px 6px;
-}
-
-.disclosure {
-  background: transparent;
-  border: none;
+  margin: 0;
   color: var(--mutedColor);
-  padding: 2px 4px;
-}
-
-.quiet ul {
-  margin: 4px 0 2px;
-  padding: 0 0 0 20px;
-  font-size: 12.5px;
-}
-
-.quiet li {
-  padding: 1px 0;
-}
-
-.error {
-  color: var(--dangerColor);
 }
 </style>
