@@ -1,0 +1,15 @@
+node_modules/
+dist/
+target/
+src-tauri/target/
+src-tauri/gen/schemas/
+*.log
+.env*
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+
+.idea/
+.vscode/
+PROMPT.md

@@ -1,0 +1,21 @@
+[package]
+name = "scenefinder-core"
+description = "Finds a player's standout moments in Diabotical demo files"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+flate2 = { version = "1.1", default-features = false, features = ["zlib-rs"] }
+rayon = "1.10"
+postcard = { version = "1.1", features = ["use-std"] }
+
+[features]
+cli = []
+zlib-ng = ["flate2/zlib-ng"]
+
+[[bin]]
+name = "scenefinder"
+path = "src/bin/scenefinder.rs"
+required-features = ["cli"]

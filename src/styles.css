@@ -1,0 +1,303 @@
+/* App-wide theme variables. The chart helpers (src/lib/charts.ts) read the
+   --h1Color / --shadeColor / --mutedColor / --bgColor custom properties, same
+   names as the portfolio blog they were ported from. */
+:root {
+  color-scheme: light dark;
+  --bgColor: #ffffff;
+  --fgColor: #1f2328;
+  --h1Color: #1f2328;
+  --mutedColor: #59636e;
+  --shadeColor: #eff1f3;
+  --borderColor: #d1d9e0;
+  --chromeBg: #f6f8fa;
+  --inputBg: #ffffff;
+  --btnBg: #f6f8fa;
+  --btnHoverBg: #eceff2;
+  --btnActiveBg: #e2e6ea;
+  --accentColor: #0b756b;
+  --accentBg: #0b756b;
+  --accentBgHover: #095f57;
+  --accentFg: #ffffff;
+  --dangerColor: #d1242f;
+  --successColor: #1a7f37;
+  --warningColor: #bc4c00;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+:root[data-theme='dark'] {
+  --bgColor: #0d1117;
+  --fgColor: #f0f6fc;
+  --h1Color: #f0f6fc;
+  --mutedColor: #9198a1;
+  --shadeColor: #21262d;
+  --borderColor: #3d444d;
+  --chromeBg: #161b22;
+  --inputBg: #161b22;
+  --btnBg: #21262d;
+  --btnHoverBg: #292f38;
+  --btnActiveBg: #30363d;
+  --accentColor: #3ec8b8;
+  --accentBg: #0e8074;
+  --accentBgHover: #109387;
+  --accentFg: #ffffff;
+  --dangerColor: #f85149;
+  --successColor: #3fb950;
+  --warningColor: #f0883e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bgColor);
+  color: var(--fgColor);
+  user-select: none;
+  cursor: default;
+  overscroll-behavior: none;
+}
+
+input,
+textarea {
+  user-select: text;
+}
+
+code,
+pre {
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+/* Desktop-native control set: crisp bordered buttons, arrow cursor (not the
+   web pointer), pressed state. `.primary` fills with the accent, `.small` is
+   the compact variant for in-table row actions. */
+button {
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+  background: var(--btnBg);
+  border: 1px solid var(--borderColor);
+  border-radius: 5px;
+  padding: 3px 12px;
+  cursor: default;
+}
+
+button:hover:not(:disabled) {
+  background: var(--btnHoverBg);
+}
+
+button:active:not(:disabled) {
+  background: var(--btnActiveBg);
+}
+
+button:disabled {
+  opacity: 0.5;
+}
+
+button.primary {
+  background: var(--accentBg);
+  border-color: var(--accentBg);
+  color: var(--accentFg);
+}
+
+button.primary:hover:not(:disabled),
+button.primary:active:not(:disabled) {
+  background: var(--accentBgHover);
+  border-color: var(--accentBgHover);
+}
+
+button.danger {
+  color: var(--dangerColor);
+}
+
+button.small {
+  padding: 1px 8px;
+  font-size: 12px;
+}
+
+/* Checkboxes and radios follow the accent instead of the UA's blue. */
+input[type='checkbox'],
+input[type='radio'] {
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  display: inline-grid;
+  place-content: center;
+  flex-shrink: 0;
+  vertical-align: middle;
+  background: var(--inputBg);
+  border: 1px solid var(--borderColor);
+  border-radius: 4px;
+}
+
+input[type='radio'] {
+  border-radius: 50%;
+}
+
+input[type='checkbox']:hover:not(:disabled),
+input[type='radio']:hover:not(:disabled) {
+  border-color: var(--mutedColor);
+}
+
+input[type='checkbox']:checked,
+input[type='radio']:checked {
+  background: var(--accentBg);
+  border-color: var(--accentBg);
+}
+
+input[type='checkbox']:checked::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  background: var(--accentFg);
+  clip-path: polygon(14% 44%, 0 61%, 40% 100%, 100% 16%, 84% 5%, 38% 72%);
+}
+
+input[type='radio']:checked::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accentFg);
+}
+
+input[type='checkbox']:disabled,
+input[type='radio']:disabled {
+  opacity: 0.5;
+}
+
+/* Range sliders follow the accent too. The track's accent fill needs the
+   value as a percentage, which CSS can't read from the input — components set
+   `--range-fill` inline; without it the track is plain. */
+input[type='range'] {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 6px;
+  margin: 6px 0;
+  padding: 0;
+  border: 1px solid var(--borderColor);
+  border-radius: 3px;
+  background: linear-gradient(
+    to right,
+    var(--accentBg) var(--range-fill, 0%),
+    var(--inputBg) var(--range-fill, 0%)
+  );
+}
+
+input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--accentBg);
+  border-radius: 50%;
+  background: var(--accentBg);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--accentBg);
+  border-radius: 50%;
+  background: var(--accentBg);
+}
+
+input[type='range']:hover:not(:disabled)::-webkit-slider-thumb {
+  background: var(--accentBgHover);
+  border-color: var(--accentBgHover);
+}
+
+input[type='range']:hover:not(:disabled)::-moz-range-thumb {
+  background: var(--accentBgHover);
+  border-color: var(--accentBgHover);
+}
+
+input[type='range']:focus {
+  outline: none;
+}
+
+input[type='range']:focus-visible {
+  outline: none;
+  border-color: var(--accentColor);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accentColor) 25%, transparent);
+}
+
+input[type='range']:disabled {
+  opacity: 0.5;
+}
+
+/* Text fields and selects share the buttons' metrics (13px type, 3px vertical
+   padding, 1px border) so mixed rows of controls all land on one height. The
+   select drops its native chrome for the same reason — platform popup buttons
+   ignore these metrics. */
+input[type='text'],
+input[type='number'],
+textarea,
+select {
+  font: inherit;
+  font-size: 13px;
+  color: var(--fgColor);
+  background: var(--inputBg);
+  border: 1px solid var(--borderColor);
+  border-radius: 5px;
+  padding: 3px 8px;
+}
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 26px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2359636e' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+
+:root[data-theme='dark'] select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239198a1' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+input[type='text']:focus,
+input[type='number']:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accentColor);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accentColor) 25%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accentColor);
+  outline-offset: 1px;
+}
+
+input[type='text']:focus-visible,
+input[type='number']:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+}
+
+h1,
+h2,
+h3 {
+  color: var(--h1Color);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
