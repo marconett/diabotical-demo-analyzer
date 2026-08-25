@@ -2,7 +2,7 @@
 
 A desktop app that finds a player's standout moments ("scenes") in Diabotical demo files: windows of a few seconds in which one player dealt a lot of damage and/or scored several frags, optionally only those that end with the player's round-winning frag.
 
-Built for large collections: a folder of ~1000 demos (13 GB) scanned in ~5s on my NVME.\
+Built for large collections: a folder of ~1000 demos (14 GB) scanned in ~9s on my NVME.\
 Extracted data is cached so every later run with different parameters is instant.
 
 ![Diabotical Demo Analyzer showing three scenes found across 934 demos](screenshot.png)
@@ -19,13 +19,14 @@ Diabotical writes replays to the following folders. Point the app at this folder
 ## Usage
 
 1. Pick a demo file (`.rbr` client recording, `.srd` server recording) or a folder, or drop it anywhere onto the window. Folders are searched recursively.
-2. The player list is filled from the start of every demo. Pick names from the suggestions or type any name (a player who joined mid-match may only show up after a full scan cached the demo).
+2. Pick player names you want to look up (a player who joined mid-match may only show up after a full scan cached the demo).
 3. Set the criteria, exactly as on the command line:
-   - **Min. damage** (`-dmg`) and **Min. frags** (`-frags`): thresholds within the window. At least one of them, or **Round win**, is required.
-   - **Combine** (`-c and|or`): whether both thresholds must hold (default) or either, only relevant when both are set.
+   - **Min. damage** (`-dmg`) and **Min. frags** (`-frags`): thresholds within the time window. At least one of them, or **Round win**, is required.
+   - **Combine** (`-c and|or`): whether both thresholds must hold or either, only relevant when both are set.
    - **Time window** (`-t`): window length in seconds; required with a damage or frag threshold.
-   - **Round win** (`-win`): the scene must end with the player's round-winning frag (the round may close up to 1 s after the window). Alone, it lists every round-winning frag the player scored.
-4. Run. Every scene is one row; "Copy command" puts a `/play <demo> <seconds>` line on the clipboard that, pasted into the Diabotical console, opens the demo 5 seconds before the scene.
+   - **Round win** (`-win`): the scene must end with the player's round-winning frag.
+4. Run.
+5. Use "Copy command" to copy a console command into the clipboard and paste it into the Diabotical console to watch the scene.
 
 ## Building
 
@@ -52,8 +53,3 @@ Tests: `cargo test --workspace --features scenefinder-core/cli`.
 Each demo is read once through a streaming gzip inflate; the container framing is walked without decoding messages, and only the handful of message types the search needs (damage totals, kill feed, team assignment, round score, player names) are decoded. Truncated recordings, which are common, are read up to the point where they stop. The per-demo extract (~50 KB) is what gets cached; the scene search itself runs over these extracts in microseconds.
 
 Demos are processed in parallel across all cores, largest first. Cancelling stops every worker within a chunk.
-
-## Notes
-
-- `.srd` server recordings are supported per the format description but have not been exercised against real files.
-- Output matches the reference Python implementation byte-for-byte on the sample demos, including its choice among equally good windows for round-winning scenes (which in Python follows set iteration order; the core reproduces that order).
