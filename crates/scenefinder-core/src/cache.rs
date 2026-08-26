@@ -13,7 +13,7 @@ use crate::extract::DemoExtract;
 
 const MAGIC: &[u8; 4] = b"SFXC";
 /// Bump whenever `DemoExtract` or the extraction rules change.
-const CACHE_VERSION: u16 = 1;
+const CACHE_VERSION: u16 = 4;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileIdentity {

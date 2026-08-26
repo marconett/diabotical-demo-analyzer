@@ -39,13 +39,52 @@ export interface DiscoverResult {
 
 export type Condition = 'AND' | 'OR';
 
+export type RuleKind =
+  | 'damage'
+  | 'frags'
+  | 'speed'
+  | 'accuracy'
+  | 'siphonator'
+  | 'flagCarrier'
+  | 'roundWin'
+  | 'falloutDeath';
+
+interface RuleBase {
+  id: string;
+  kind: RuleKind;
+}
+
+export type SearchRule =
+  | (RuleBase & { kind: 'damage'; minimum: number; weapon: number | null })
+  | (RuleBase & { kind: 'frags'; minimum: number; weapon: number | null })
+  | (RuleBase & { kind: 'speed'; minimum: number; duration: number })
+  | (RuleBase & { kind: 'accuracy'; minimum: number; weapon: number })
+  | (RuleBase & { kind: 'falloutDeath'; exclude: boolean })
+  | (RuleBase & { kind: 'siphonator' | 'flagCarrier' | 'roundWin' });
+
+export interface RuleGroup {
+  id: string;
+  condition: Condition;
+  rules: SearchRule[];
+}
+
+export interface RuleQuery {
+  condition: Condition;
+  groups: RuleGroup[];
+}
+
 export interface Params {
   players: string[];
   damage: number | null;
   frags: number | null;
+  weapon: number | null;
+  speed: number | null;
+  speedDuration: number | null;
+  accuracy: number | null;
   condition: Condition;
   win: boolean;
   window: number | null;
+  ruleQuery: RuleQuery | null;
 }
 
 export interface DemoMeta {
@@ -65,8 +104,21 @@ export interface Scene {
   player: string;
   damage: number | null;
   frags: number | null;
+  weapon: number | null;
+  speed: number | null;
+  speedDuration: number | null;
+  accuracy: number | null;
   round: number | null;
+  criteria: SceneMetric[];
   line: string;
+}
+
+export interface SceneMetric {
+  ruleId: string;
+  label: string;
+  value: number;
+  secondary: number | null;
+  display: string;
 }
 
 export interface DemoReport {

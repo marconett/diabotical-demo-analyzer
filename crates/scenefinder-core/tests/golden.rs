@@ -4,7 +4,8 @@
 use std::path::PathBuf;
 
 use scenefinder_core::{
-    discover_players, list_demos_many, run, Cache, Condition, Params, RunControl,
+    discover_players, list_demos_many, run, scan_demo, Cache, Condition, Params, RunControl,
+    ScanOptions,
 };
 
 fn samples() -> Option<PathBuf> {
@@ -16,6 +17,24 @@ fn samples() -> Option<PathBuf> {
     dir.join("WIPEOUT-2026_06_12-22_03_40.rbr")
         .exists()
         .then_some(dir)
+}
+
+#[test]
+fn golden_real_ringout_weapon_flag() {
+    let Some(path) = std::env::var_os("SCENEFINDER_RINGOUT_SAMPLE").map(PathBuf::from) else {
+        return;
+    };
+    let extract = scan_demo(&path, &ScanOptions::default()).unwrap();
+    assert!(extract
+        .fallout_deaths
+        .values()
+        .flatten()
+        .any(|time| (*time - 368.88).abs() < 0.1));
+    assert!(extract
+        .frag_weapons
+        .values()
+        .flatten()
+        .any(|(time, weapon)| (*time - 368.88).abs() < 0.1 && *weapon == 205));
 }
 
 fn params(
@@ -30,9 +49,14 @@ fn params(
         players: players.iter().map(|s| s.to_string()).collect(),
         damage,
         frags,
+        weapon: None,
+        speed: None,
+        speed_duration: None,
+        accuracy: None,
         condition: if or { Condition::Or } else { Condition::And },
         win,
         window,
+        rule_query: None,
     }
 }
 

@@ -11,7 +11,8 @@ use scenefinder_core::{
 };
 
 const USAGE: &str = "usage: scenefinder [--no-cache] [--cache-dir DIR] [--bench] [--discover] \
-<demo or folder>... -p NAME [-p NAME ...] [-dmg N] [-frags N] [-c and|or] [-win] [-t SECONDS]";
+<demo or folder>... -p NAME [-p NAME ...] [-dmg N] [-weapon ID] [-speed N] \
+[-speed-for SECONDS] [-accuracy PERCENT] [-frags N] [-c and|or] [-win] [-t SECONDS]";
 
 fn main() -> ExitCode {
     let mut inputs: Vec<PathBuf> = Vec::new();
@@ -19,9 +20,14 @@ fn main() -> ExitCode {
         players: Vec::new(),
         damage: None,
         frags: None,
+        weapon: None,
+        speed: None,
+        speed_duration: None,
+        accuracy: None,
         condition: Condition::And,
         win: false,
         window: None,
+        rule_query: None,
     };
     let mut use_cache = true;
     let mut cache_dir: Option<PathBuf> = None;
@@ -43,6 +49,10 @@ fn main() -> ExitCode {
             }
             "-p" | "--player_name" => params.players.push(value("-p")),
             "-dmg" | "--damage_threshold" => params.damage = Some(parse(&value("-dmg"), "-dmg")),
+            "-weapon" => params.weapon = Some(parse(&value("-weapon"), "-weapon")),
+            "-speed" => params.speed = Some(parse(&value("-speed"), "-speed")),
+            "-speed-for" => params.speed_duration = Some(parse(&value("-speed-for"), "-speed-for")),
+            "-accuracy" => params.accuracy = Some(parse(&value("-accuracy"), "-accuracy")),
             "-frags" => params.frags = Some(parse(&value("-frags"), "-frags")),
             "-c" | "--condition" => {
                 params.condition = match value("-c").to_ascii_uppercase().as_str() {

@@ -1,6 +1,6 @@
 # Diabotical Demo Analyzer
 
-A desktop app that finds a player's standout moments ("scenes") in Diabotical demo files: windows of a few seconds in which one player dealt a lot of damage and/or scored several frags, optionally only those that end with the player's round-winning frag.
+A desktop app that finds a player's standout moments ("scenes") in Diabotical demo files: high-damage fights, frag streaks, fast movement, strong weapon-specific performance, and optionally only scenes that end with the player's round-winning frag.
 
 Built for large collections: a folder of ~1000 demos (14 GB) scanned in ~9s on my NVME.\
 Extracted data is cached so every later run with different parameters is instant.
@@ -20,11 +20,14 @@ Diabotical writes replays to the following folders. Point the app at this folder
 
 1. Pick a demo file (`.rbr` client recording, `.srd` server recording) or a folder, or drop it anywhere onto the window. Folders are searched recursively.
 2. Pick player names you want to look up (a player who joined mid-match may only show up after a full scan cached the demo).
-3. Set the criteria, exactly as on the command line:
-   - **Min. damage** (`-dmg`) and **Min. frags** (`-frags`): thresholds within the time window. At least one of them, or **Round win**, is required.
-   - **Combine** (`-c and|or`): whether both thresholds must hold or either, only relevant when both are set.
-   - **Time window** (`-t`): window length in seconds; required with a damage or frag threshold.
-   - **Round win** (`-win`): the scene must end with the player's round-winning frag.
+3. Build criteria groups. Each group can match all or any of its criteria, and
+   multiple groups can also match all or any. Criteria include damage, frags,
+   movement speed, weapon accuracy, carrying the flag, siphonator active,
+   round-winning frags, and required/excluded fallout deaths. Damage and frags
+   can optionally be scoped to a weapon.
+   Weapon-specific damage is available for the recording POV. Accuracy is the
+   game's cumulative match-to-date value. Speed is the server-reported
+   horizontal velocity, so teleporters do not create false spikes.
 4. Run.
 5. Use "Copy command" to copy a console command into the clipboard and paste it into the Diabotical console to watch the scene.
 
@@ -42,6 +45,8 @@ The core lives in `crates/scenefinder-core` and has no Tauri dependency. It also
 
 ```bash
 cargo run --release -p scenefinder-core --features cli -- ~/demos -p PlayerName -dmg 200 -frags 2 -c or -t 5
+cargo run --release -p scenefinder-core --features cli -- ~/demos -p PlayerName -speed 1200 -speed-for 1 -t 8
+cargo run --release -p scenefinder-core --features cli -- ~/demos -p PlayerName -weapon 4 -dmg 300 -accuracy 35 -c and -t 10
 cargo run --release -p scenefinder-core --features cli -- --discover ~/demos          # list player names
 cargo run --release -p scenefinder-core --features cli -- --bench --no-cache ~/demos -p x -dmg 1 -t 5
 ```
@@ -50,6 +55,6 @@ Tests: `cargo test --workspace --features scenefinder-core/cli`.
 
 ## How it works
 
-Each demo is read once through a streaming gzip inflate; the container framing is walked without decoding messages, and only the handful of message types the search needs (damage totals, kill feed, team assignment, round score, player names) are decoded. Truncated recordings, which are common, are read up to the point where they stop. The per-demo extract (~50 KB) is what gets cached; the scene search itself runs over these extracts in microseconds.
+Each demo is read once through a streaming gzip inflate; the container framing is walked without decoding messages, and only the verified messages the search needs are decoded: movement velocity, POV assignment, damage, weapon accuracy, kill feed and killing weapon, flag state, siphonator events, team assignment, round score, and player names. Truncated recordings, which are common, are read up to the point where they stop. The compact per-demo extract is what gets cached, so later searches with different parameters are fast.
 
 Demos are processed in parallel across all cores, largest first. Cancelling stops every worker within a chunk.

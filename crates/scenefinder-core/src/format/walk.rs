@@ -1,5 +1,5 @@
-//! Walks the inflated frame stream and hands out the raw bytes of the
-//! messages the scene finder decodes (property 0xDD and text 0xFF).
+//! Walks the inflated frame stream and hands out the raw bytes of the game
+//! messages the scene finder decodes.
 //!
 //! EVGR streams start with a `u32` and 5 padding bytes, then a sequence of
 //! records tagged by a `u8` type: 1 = `f32 ts, 5 pad, u32 len, msg[len], 8
@@ -15,6 +15,10 @@
 use super::header::Magic;
 
 pub const MSG_PROPERTY: u8 = 0xDD;
+pub const MSG_ENTITY_EVENT: u8 = 0xDE;
+pub const MSG_DAMAGE: u8 = 0xE3;
+pub const MSG_ACCURACY: u8 = 0xE5;
+pub const MSG_MOVEMENT: u8 = 0xEA;
 pub const MSG_TEXT: u8 = 0xFF;
 
 const EVGR_STREAM_HEADER: u64 = 9;
@@ -48,8 +52,23 @@ fn f32_at(buf: &[u8], off: usize) -> f32 {
     f32::from_le_bytes(buf[off..off + 4].try_into().unwrap())
 }
 
-pub fn is_relevant(id: u8) -> bool {
-    id == MSG_PROPERTY || id == MSG_TEXT
+fn is_relevant(magic: Magic, id: u8) -> bool {
+    match magic {
+        Magic::Evgr => matches!(
+            id,
+            MSG_PROPERTY | MSG_ENTITY_EVENT | MSG_DAMAGE | MSG_ACCURACY | MSG_MOVEMENT | MSG_TEXT
+        ),
+        // DamageInstance is unicast to an EVGR client's POV and cannot be
+        // attributed in a server recording. The other messages carry ids.
+        Magic::Dbsr => matches!(
+            id,
+            MSG_PROPERTY | MSG_ENTITY_EVENT | MSG_ACCURACY | MSG_MOVEMENT | MSG_TEXT
+        ),
+    }
+}
+
+pub enum Item<'a> {
+    Message { ts: f32, data: &'a [u8] },
 }
 
 enum Step {
@@ -112,7 +131,7 @@ impl Walker {
                     if avail < EVGR_MSG_HEADER + 1 {
                         return Step::NeedMore;
                     }
-                    if is_relevant(buf[off + EVGR_MSG_HEADER]) {
+                    if is_relevant(self.magic, buf[off + EVGR_MSG_HEADER]) {
                         Step::Relevant {
                             total,
                             msg_start: off + EVGR_MSG_HEADER,
@@ -126,6 +145,8 @@ impl Walker {
                         }
                     }
                 }
+                // The meaning of this fixed-size EVGR record is not verified;
+                // movement comes from the explicit 0xEA message instead.
                 2 => Step::Skip {
                     total: 25,
                     counts: false,
@@ -168,7 +189,7 @@ impl Walker {
                 if avail < DBSR_FRAME_HEADER + 1 {
                     return Step::NeedMore;
                 }
-                if is_relevant(buf[off + DBSR_FRAME_HEADER]) {
+                if is_relevant(self.magic, buf[off + DBSR_FRAME_HEADER]) {
                     Step::Relevant {
                         total,
                         msg_start: off + DBSR_FRAME_HEADER,
@@ -190,7 +211,7 @@ impl Walker {
     /// it again with more data appended. When `skip` is non-zero afterwards,
     /// that many further stream bytes belong to an irrelevant record and must
     /// be dropped (see `skipped`) before feeding again.
-    pub fn feed(&mut self, buf: &[u8], sink: &mut impl FnMut(f32, &[u8])) -> usize {
+    pub fn feed(&mut self, buf: &[u8], sink: &mut impl FnMut(Item<'_>)) -> usize {
         let mut off = 0;
         while off < buf.len() && self.stopped.is_none() && self.skip == 0 {
             match self.classify(buf, off) {
@@ -205,7 +226,10 @@ impl Walker {
                         break;
                     }
                     self.msg_count += 1;
-                    sink(ts, &buf[msg_start..msg_start + msg_len]);
+                    sink(Item::Message {
+                        ts,
+                        data: &buf[msg_start..msg_start + msg_len],
+                    });
                     off += total;
                 }
                 Step::Skip { total, counts } => {
@@ -289,7 +313,10 @@ mod tests {
                     pos = end;
                 }
             }
-            let consumed = walker.feed(&buf, &mut |ts, msg| got.push((ts, msg.to_vec())));
+            let consumed = walker.feed(&buf, &mut |item| {
+                let Item::Message { ts, data } = item;
+                got.push((ts, data.to_vec()));
+            });
             buf.drain(..consumed);
             if walker.stopped.is_some() {
                 return (got, walker);
@@ -317,9 +344,15 @@ mod tests {
             m
         };
         let other = vec![0xDCu8; 36];
+        let movement = vec![0xEAu8; 12];
+        let entity = vec![0xDEu8; 24];
         let mut s = vec![0u8; 9];
         let mut expect = Vec::new();
         s.extend(rec_msg(1.5, &other));
+        s.extend(rec_msg(1.75, &movement));
+        expect.push((1.75, movement));
+        s.extend(rec_msg(1.8, &entity));
+        expect.push((1.8, entity));
         s.extend(rec_msg(2.0, &prop));
         expect.push((2.0, prop.clone()));
         s.extend([2u8]);
@@ -341,7 +374,7 @@ mod tests {
         for chunk in [stream.len(), 1, 2, 3, 7, 13, 64, 1000] {
             let (got, walker) = drive(Magic::Evgr, &stream, chunk);
             assert_eq!(got, expect, "chunk size {chunk}");
-            assert_eq!(walker.msg_count, 5, "chunk size {chunk}");
+            assert_eq!(walker.msg_count, 7, "chunk size {chunk}");
             assert!(walker.stopped.is_none());
         }
     }
@@ -351,7 +384,7 @@ mod tests {
         let (stream, expect) = evgr_stream();
         let cut = &stream[..stream.len() - 3];
         let (got, walker) = drive(Magic::Evgr, cut, 5);
-        assert_eq!(got, expect[..2].to_vec());
+        assert_eq!(got, expect[..expect.len() - 1].to_vec());
         assert!(walker.stopped.is_none());
     }
 

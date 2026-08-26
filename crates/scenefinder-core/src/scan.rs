@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use crate::extract::{DemoExtract, Extractor};
 use crate::format::header::{read_header, FormatError};
 use crate::format::inflate::Inflater;
-use crate::format::walk::{Stop, Walker};
+use crate::format::walk::{Item, Stop, Walker};
 
 const READ_BUF: usize = 1 << 20;
 const CHUNK: usize = 1 << 20;
@@ -89,7 +89,9 @@ pub fn scan_demo(path: &Path, opts: &ScanOptions) -> Result<DemoExtract, ScanErr
     let mut buf = vec![0u8; CHUNK];
     let mut filled = 0usize;
     let mut budget_hit = false;
-    let mut sink = |ts: f32, msg: &[u8]| extractor.on_msg(ts, msg);
+    let mut sink = |item: Item<'_>| match item {
+        Item::Message { ts, data } => extractor.on_msg(ts, data),
+    };
 
     loop {
         if opts.cancel.is_some_and(|c| c.load(Ordering::Relaxed)) {

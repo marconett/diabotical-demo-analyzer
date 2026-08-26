@@ -51,52 +51,12 @@
         </Panel>
 
         <Panel title="Criteria">
-          <div class="grid">
-            <label for="dmg">Min. damage</label>
-            <input
-              id="dmg"
-              v-model.number="damageInput"
-              type="number"
-              min="0"
-              step="1"
-              placeholder="none"
-              :disabled="busy === 'run'"
-            />
-
-            <label for="frags">Min. frags</label>
-            <input
-              id="frags"
-              v-model.number="fragsInput"
-              type="number"
-              min="0"
-              step="1"
-              placeholder="none"
-              :disabled="busy === 'run'"
-            />
-
-            <span class="label">Combine</span>
-            <div class="radios" :class="{ off: !bothThresholds }">
-              <label
-                ><input
-                  v-model="params.condition"
-                  type="radio"
-                  value="AND"
-                  :disabled="!bothThresholds || busy === 'run'"
-                />
-                AND</label
-              >
-              <label
-                ><input
-                  v-model="params.condition"
-                  type="radio"
-                  value="OR"
-                  :disabled="!bothThresholds || busy === 'run'"
-                />
-                OR</label
-              >
-              <span class="hint">how damage and frags combine when both are set</span>
-            </div>
-
+          <CriteriaBuilder
+            v-if="params.ruleQuery"
+            v-model="params.ruleQuery"
+            :disabled="busy === 'run'"
+          />
+          <div class="window-row">
             <label for="window">Time window</label>
             <div class="with-unit">
               <input
@@ -108,18 +68,15 @@
                 placeholder="seconds"
                 :disabled="busy === 'run'"
               />
-              <span class="hint">seconds; required with damage / frags</span>
+              <span class="hint">seconds; required with metric thresholds</span>
             </div>
-
-            <span class="label">Round win</span>
-            <label class="check">
-              <input v-model="params.win" type="checkbox" :disabled="busy === 'run'" />
-              <span>
-                must end with the player's round-winning frag
-                <span class="hint">alone: lists every round-winning frag</span>
-              </span>
-            </label>
           </div>
+
+          <p class="criteria-note">
+            Speed is the server-reported horizontal velocity, so teleporters do not create false
+            spikes. Weapon damage is available for the recording POV. Accuracy is the game's
+            cumulative value at the scene, not accuracy within the window.
+          </p>
 
           <div class="actions">
             <button class="primary" :disabled="!canRun" @click="run">Run</button>
@@ -173,6 +130,7 @@ import PathPicker from './components/PathPicker.vue';
 import TagInput from './components/TagInput.vue';
 import ProgressBar from './components/ProgressBar.vue';
 import ResultsTable from './components/ResultsTable.vue';
+import CriteriaBuilder from './components/CriteriaBuilder.vue';
 import * as api from './lib/api';
 import { fmtBytes, fmtSeconds } from './lib/format';
 import { initTheme } from './lib/theme';
@@ -190,12 +148,27 @@ const params = reactive<Params>({
   players: [],
   damage: 500,
   frags: 4,
+  weapon: null,
+  speed: null,
+  speedDuration: null,
+  accuracy: null,
   condition: 'AND',
   win: false,
   window: 15,
+  ruleQuery: {
+    condition: 'AND',
+    groups: [
+      {
+        id: 'group-1',
+        condition: 'AND',
+        rules: [
+          { id: 'damage-1', kind: 'damage', minimum: 500, weapon: null },
+          { id: 'frags-1', kind: 'frags', minimum: 4, weapon: null },
+        ],
+      },
+    ],
+  },
 });
-const damageInput = ref<number | ''>(500);
-const fragsInput = ref<number | ''>(4);
 const windowInput = ref<number | ''>(15);
 const busy = ref<Busy>('idle');
 const progress = ref<Progress | null>(null);
@@ -203,19 +176,8 @@ const report = ref<RunReport | null>(null);
 const error = ref<string | null>(null);
 const cache = ref<CacheStats | null>(null);
 const dragging = ref(false);
-
-// Number inputs report '' when cleared; the parameters use null for "unset".
-watch(
-  damageInput,
-  (v) => (params.damage = typeof v === 'number' && Number.isFinite(v) ? Math.trunc(v) : null),
-);
-watch(
-  fragsInput,
-  (v) => (params.frags = typeof v === 'number' && Number.isFinite(v) ? Math.trunc(v) : null),
-);
 watch(windowInput, (v) => (params.window = typeof v === 'number' && Number.isFinite(v) ? v : null));
 
-const bothThresholds = computed(() => params.damage !== null && params.frags !== null);
 const validation = computed(() =>
   demoList.value?.files.length ? validateParams(params) : 'choose a demo file or folder first',
 );
@@ -295,7 +257,7 @@ async function run() {
   const sent: Params = {
     ...params,
     players: [...params.players],
-    condition: bothThresholds.value ? params.condition : 'AND',
+    ruleQuery: params.ruleQuery ? JSON.parse(JSON.stringify(params.ruleQuery)) : null,
   };
   try {
     report.value = await api.runSceneFinder(demoPaths.value, sent, (p) => (progress.value = p));
@@ -481,6 +443,10 @@ onMounted(async () => {
   width: 120px;
 }
 
+.grid select {
+  width: 155px;
+}
+
 .with-unit {
   display: flex;
   align-items: center;
@@ -516,6 +482,22 @@ onMounted(async () => {
 
 .check .hint {
   display: block;
+}
+
+.criteria-note {
+  margin: 12px 0 0;
+  color: var(--mutedColor);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.window-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 13px;
 }
 
 .actions {

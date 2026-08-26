@@ -20,17 +20,44 @@
       <thead>
         <tr>
           <th class="action"></th>
-          <th>Demo</th>
-          <th class="num">Time</th>
+          <th>
+            <button class="sort" @click="sortBy('demo')">Demo{{ marker('demo') }}</button>
+          </th>
+          <th class="num">
+            <button class="sort" @click="sortBy('time')">Time{{ marker('time') }}</button>
+          </th>
           <th>Mode</th>
           <th>Map</th>
           <th>Player</th>
-          <th class="num">Damage</th>
-          <th class="num">Frags</th>
+          <template v-if="criteriaColumns.length">
+            <th v-for="column in criteriaColumns" :key="column.id" class="num criterion">
+              <button class="sort" @click="sortBy(`criterion:${column.id}`)">
+                {{ column.label }}{{ marker(`criterion:${column.id}`) }}
+              </button>
+            </th>
+          </template>
+          <template v-else>
+            <th v-if="hasWeapon">Weapon</th>
+            <th class="num">
+              <button class="sort" @click="sortBy('damage')">Damage{{ marker('damage') }}</button>
+            </th>
+            <th class="num">
+              <button class="sort" @click="sortBy('frags')">Frags{{ marker('frags') }}</button>
+            </th>
+            <th v-if="hasSpeed" class="num">
+              <button class="sort" @click="sortBy('speed')">Max speed{{ marker('speed') }}</button>
+            </th>
+            <th v-if="hasSpeed" class="num">Time ≥ min</th>
+            <th v-if="hasAccuracy" class="num">
+              <button class="sort" @click="sortBy('accuracy')">
+                Accuracy{{ marker('accuracy') }}
+              </button>
+            </th>
+          </template>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="r in rows" :key="r.key" :title="r.command">
+        <tr v-for="r in sortedRows" :key="r.key" :title="r.command">
           <td class="action">
             <button class="small copy" :class="{ done: copiedKey === r.key }" @click="copy(r)">
               {{ copiedKey === r.key ? 'Copied' : 'Copy command' }}
@@ -41,8 +68,21 @@
           <td>{{ r.mode }}</td>
           <td>{{ r.map }}</td>
           <td>{{ r.player }}</td>
-          <td class="num">{{ r.damage ?? '' }}</td>
-          <td class="num">{{ r.frags ?? '' }}</td>
+          <template v-if="criteriaColumns.length">
+            <td v-for="column in criteriaColumns" :key="column.id" class="num">
+              {{ r.criteria[column.id]?.display ?? '' }}
+            </td>
+          </template>
+          <template v-else>
+            <td v-if="hasWeapon">{{ weaponName(r.weapon) }}</td>
+            <td class="num">{{ r.damage ?? '' }}</td>
+            <td class="num">{{ r.frags ?? '' }}</td>
+            <td v-if="hasSpeed" class="num">{{ r.speed ?? '' }}</td>
+            <td v-if="hasSpeed" class="num">{{ fmtDuration(r.speedDuration) }}</td>
+            <td v-if="hasAccuracy" class="num">
+              {{ r.accuracy === null ? '' : `${r.accuracy.toFixed(1)}%` }}
+            </td>
+          </template>
         </tr>
       </tbody>
     </table>
@@ -55,7 +95,8 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { RunReport } from '../lib/types';
+import type { RunReport, SceneMetric } from '../lib/types';
+import { weaponName } from '../lib/weapons';
 
 const props = defineProps<{ report: RunReport }>();
 
@@ -64,11 +105,17 @@ interface Row {
   command: string;
   fileName: string;
   time: string;
+  start: number;
   mode: string;
   map: string;
   player: string;
   damage: number | null;
   frags: number | null;
+  weapon: number | null;
+  speed: number | null;
+  speedDuration: number | null;
+  accuracy: number | null;
+  criteria: Record<string, SceneMetric>;
 }
 
 // Seconds before the scene at which playback starts, so the run-up is visible.
@@ -85,18 +132,74 @@ const rows = computed<Row[]>(() =>
       command: `/play ${demoName} ${Math.max(0, Math.floor(s.start - LEAD_SECONDS))}`,
       fileName: d.fileName,
       time: s.clock.replace(/^\[|\]$/g, ''),
+      start: s.start,
       mode: d.meta?.gameMode ?? '',
       map: d.meta?.mapName ?? '',
       player: s.player,
       damage: s.damage,
       frags: s.frags,
+      weapon: s.weapon,
+      speed: s.speed,
+      speedDuration: s.speedDuration,
+      accuracy: s.accuracy,
+      criteria: Object.fromEntries((s.criteria ?? []).map((metric) => [metric.ruleId, metric])),
     }));
   }),
 );
 
+const criteriaColumns = computed(() => {
+  const columns = new Map<string, string>();
+  for (const row of rows.value) {
+    for (const metric of Object.values(row.criteria)) columns.set(metric.ruleId, metric.label);
+  }
+  return [...columns].map(([id, label]) => ({ id, label }));
+});
+
+const sortKey = ref('time');
+const sortDirection = ref<1 | -1>(1);
+
+function sortBy(key: string) {
+  if (sortKey.value === key) sortDirection.value = sortDirection.value === 1 ? -1 : 1;
+  else {
+    sortKey.value = key;
+    sortDirection.value = key === 'time' || key === 'demo' ? 1 : -1;
+  }
+}
+
+function marker(key: string): string {
+  return sortKey.value === key ? (sortDirection.value === 1 ? ' ▲' : ' ▼') : '';
+}
+
+function sortValue(row: Row, key: string): number | string {
+  if (key === 'time') return row.start;
+  if (key === 'demo') return row.fileName.toLocaleLowerCase();
+  if (key.startsWith('criterion:')) return row.criteria[key.slice(10)]?.value ?? -Infinity;
+  return row[key as 'damage' | 'frags' | 'speed' | 'accuracy'] ?? -Infinity;
+}
+
+const sortedRows = computed(() =>
+  [...rows.value].sort((a, b) => {
+    const av = sortValue(a, sortKey.value);
+    const bv = sortValue(b, sortKey.value);
+    const order =
+      typeof av === 'string' && typeof bv === 'string'
+        ? av.localeCompare(bv)
+        : Number(av) - Number(bv);
+    return order * sortDirection.value || a.start - b.start || a.key.localeCompare(b.key);
+  }),
+);
+
+const hasWeapon = computed(() => rows.value.some((row) => row.weapon !== null));
+const hasSpeed = computed(() => rows.value.some((row) => row.speed !== null));
+const hasAccuracy = computed(() => rows.value.some((row) => row.accuracy !== null));
+
 const withoutScenes = computed(
   () => props.report.demos.filter((d) => (d.sceneCount ?? 0) === 0).length,
 );
+
+function fmtDuration(seconds: number | null): string {
+  return seconds === null ? '' : `${seconds.toFixed(1)}s`;
+}
 
 async function copy(r: Row) {
   try {
@@ -178,6 +281,27 @@ th {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--mutedColor);
+}
+
+th.criterion {
+  max-width: 180px;
+}
+
+button.sort {
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  white-space: normal;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+button.sort:hover {
+  color: var(--fgColor);
 }
 
 td {
