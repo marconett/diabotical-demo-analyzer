@@ -1,5 +1,6 @@
 //! Walks the inflated frame stream and hands out the raw bytes of the
-//! messages the scene finder decodes (property 0xDD and text 0xFF).
+//! messages the scene finder decodes (property 0xDD, entity event 0xDE,
+//! damage instance 0xE3, and text 0xFF).
 //!
 //! EVGR streams start with a `u32` and 5 padding bytes, then a sequence of
 //! records tagged by a `u8` type: 1 = `f32 ts, 5 pad, u32 len, msg[len], 8
@@ -15,6 +16,8 @@
 use super::header::Magic;
 
 pub const MSG_PROPERTY: u8 = 0xDD;
+pub const MSG_ENTITY_EVENT: u8 = 0xDE;
+pub const MSG_DAMAGE_INSTANCE: u8 = 0xE3;
 pub const MSG_TEXT: u8 = 0xFF;
 
 const EVGR_STREAM_HEADER: u64 = 9;
@@ -49,7 +52,10 @@ fn f32_at(buf: &[u8], off: usize) -> f32 {
 }
 
 pub fn is_relevant(id: u8) -> bool {
-    id == MSG_PROPERTY || id == MSG_TEXT
+    matches!(
+        id,
+        MSG_PROPERTY | MSG_ENTITY_EVENT | MSG_DAMAGE_INSTANCE | MSG_TEXT
+    )
 }
 
 enum Step {
@@ -317,6 +323,8 @@ mod tests {
             m
         };
         let other = vec![0xDCu8; 36];
+        let entity_event = vec![0xDEu8; 24];
+        let damage = vec![0xE3u8; 35];
         let mut s = vec![0u8; 9];
         let mut expect = Vec::new();
         s.extend(rec_msg(1.5, &other));
@@ -329,6 +337,10 @@ mod tests {
         s.extend(rec5(5000));
         s.extend(rec_msg(3.25, &text));
         expect.push((3.25, text.clone()));
+        s.extend(rec_msg(3.3, &entity_event));
+        expect.push((3.3, entity_event));
+        s.extend(rec_msg(3.4, &damage));
+        expect.push((3.4, damage));
         s.extend(rec_msg(3.5, &[0xE1u8; 24]));
         s.extend(rec_msg(4.0, &prop));
         expect.push((4.0, prop));
@@ -341,7 +353,7 @@ mod tests {
         for chunk in [stream.len(), 1, 2, 3, 7, 13, 64, 1000] {
             let (got, walker) = drive(Magic::Evgr, &stream, chunk);
             assert_eq!(got, expect, "chunk size {chunk}");
-            assert_eq!(walker.msg_count, 5, "chunk size {chunk}");
+            assert_eq!(walker.msg_count, 7, "chunk size {chunk}");
             assert!(walker.stopped.is_none());
         }
     }
@@ -351,7 +363,7 @@ mod tests {
         let (stream, expect) = evgr_stream();
         let cut = &stream[..stream.len() - 3];
         let (got, walker) = drive(Magic::Evgr, cut, 5);
-        assert_eq!(got, expect[..2].to_vec());
+        assert_eq!(got, expect[..4].to_vec());
         assert!(walker.stopped.is_none());
     }
 
@@ -375,21 +387,30 @@ mod tests {
     #[test]
     fn dbsr_frames() {
         let prop = vec![0xDDu8; 25];
+        let entity_event = vec![0xDEu8; 24];
+        let damage = vec![0xE3u8; 35];
         let mut s = Vec::new();
         s.extend(frame(0.5, &[0xDCu8; 36]));
         s.extend(frame(1.0, &prop));
+        s.extend(frame(1.25, &entity_event));
+        s.extend(frame(1.4, &damage));
         s.extend(frame(1.5, &[0xE4u8; 41]));
         s.extend(frame(2.0, &prop));
         for chunk in [s.len(), 1, 4, 22, 30] {
             let (got, walker) = drive(Magic::Dbsr, &s, chunk);
             assert_eq!(
                 got,
-                vec![(1.0, prop.clone()), (2.0, prop.clone())],
+                vec![
+                    (1.0, prop.clone()),
+                    (1.25, entity_event.clone()),
+                    (1.4, damage.clone()),
+                    (2.0, prop.clone())
+                ],
                 "chunk {chunk}"
             );
-            assert_eq!(walker.msg_count, 4);
+            assert_eq!(walker.msg_count, 6);
         }
         let (got, _) = drive(Magic::Dbsr, &s[..s.len() - 1], 8);
-        assert_eq!(got.len(), 1);
+        assert_eq!(got.len(), 3);
     }
 }
