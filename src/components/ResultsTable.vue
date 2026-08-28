@@ -20,17 +20,25 @@
       <thead>
         <tr>
           <th class="action"></th>
-          <th>Demo</th>
-          <th class="num">Time</th>
+          <th>
+            <button class="sort" @click="sortBy('demo')">Demo{{ marker('demo') }}</button>
+          </th>
+          <th class="num">
+            <button class="sort" @click="sortBy('time')">Time{{ marker('time') }}</button>
+          </th>
           <th>Mode</th>
           <th>Map</th>
           <th>Player</th>
-          <th class="num">Damage</th>
-          <th class="num">Frags</th>
+          <th class="num">
+            <button class="sort" @click="sortBy('damage')">Damage{{ marker('damage') }}</button>
+          </th>
+          <th class="num">
+            <button class="sort" @click="sortBy('frags')">Frags{{ marker('frags') }}</button>
+          </th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="r in rows" :key="r.key" :title="r.command">
+        <tr v-for="r in sortedRows" :key="r.key" :title="r.command">
           <td class="action">
             <button class="small copy" :class="{ done: copiedKey === r.key }" @click="copy(r)">
               {{ copiedKey === r.key ? 'Copied' : 'Copy command' }}
@@ -64,6 +72,7 @@ interface Row {
   command: string;
   fileName: string;
   time: string;
+  start: number;
   mode: string;
   map: string;
   player: string;
@@ -85,12 +94,48 @@ const rows = computed<Row[]>(() =>
       command: `/play ${demoName} ${Math.max(0, Math.floor(s.start - LEAD_SECONDS))}`,
       fileName: d.fileName,
       time: s.clock.replace(/^\[|\]$/g, ''),
+      start: s.start,
       mode: d.meta?.gameMode ?? '',
       map: d.meta?.mapName ?? '',
       player: s.player,
       damage: s.damage,
       frags: s.frags,
     }));
+  }),
+);
+
+type SortKey = 'demo' | 'time' | 'damage' | 'frags';
+
+const sortKey = ref<SortKey>('time');
+const sortDirection = ref<1 | -1>(1);
+
+function sortBy(key: SortKey) {
+  if (sortKey.value === key) sortDirection.value = sortDirection.value === 1 ? -1 : 1;
+  else {
+    sortKey.value = key;
+    sortDirection.value = key === 'time' || key === 'demo' ? 1 : -1;
+  }
+}
+
+function marker(key: SortKey): string {
+  return sortKey.value === key ? (sortDirection.value === 1 ? ' ▲' : ' ▼') : '';
+}
+
+function sortValue(row: Row, key: SortKey): number | string {
+  if (key === 'time') return row.start;
+  if (key === 'demo') return row.fileName.toLocaleLowerCase();
+  return row[key] ?? -Infinity;
+}
+
+const sortedRows = computed(() =>
+  [...rows.value].sort((a, b) => {
+    const av = sortValue(a, sortKey.value);
+    const bv = sortValue(b, sortKey.value);
+    const order =
+      typeof av === 'string' && typeof bv === 'string'
+        ? av.localeCompare(bv)
+        : Number(av) - Number(bv);
+    return order * sortDirection.value || a.start - b.start || a.key.localeCompare(b.key);
   }),
 );
 
@@ -178,6 +223,23 @@ th {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--mutedColor);
+}
+
+button.sort {
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  white-space: normal;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+button.sort:hover {
+  color: var(--fgColor);
 }
 
 td {
