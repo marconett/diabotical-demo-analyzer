@@ -26,9 +26,15 @@
           <th class="num">
             <button class="sort" @click="sortBy('time')">Time{{ marker('time') }}</button>
           </th>
-          <th>Mode</th>
-          <th>Map</th>
-          <th>Player</th>
+          <th>
+            <button class="sort" @click="sortBy('mode')">Mode{{ marker('mode') }}</button>
+          </th>
+          <th>
+            <button class="sort" @click="sortBy('map')">Map{{ marker('map') }}</button>
+          </th>
+          <th>
+            <button class="sort" @click="sortBy('player')">Player{{ marker('player') }}</button>
+          </th>
           <th class="num">
             <button class="sort" @click="sortBy('damage')">Damage{{ marker('damage') }}</button>
           </th>
@@ -104,7 +110,7 @@ const rows = computed<Row[]>(() =>
   }),
 );
 
-type SortKey = 'demo' | 'time' | 'damage' | 'frags';
+type SortKey = 'demo' | 'time' | 'mode' | 'map' | 'player' | 'damage' | 'frags';
 
 const sortKey = ref<SortKey>('time');
 const sortDirection = ref<1 | -1>(1);
@@ -113,7 +119,7 @@ function sortBy(key: SortKey) {
   if (sortKey.value === key) sortDirection.value = sortDirection.value === 1 ? -1 : 1;
   else {
     sortKey.value = key;
-    sortDirection.value = key === 'time' || key === 'demo' ? 1 : -1;
+    sortDirection.value = key === 'damage' || key === 'frags' ? -1 : 1;
   }
 }
 
@@ -124,7 +130,8 @@ function marker(key: SortKey): string {
 function sortValue(row: Row, key: SortKey): number | string {
   if (key === 'time') return row.start;
   if (key === 'demo') return row.fileName.toLocaleLowerCase();
-  return row[key] ?? -Infinity;
+  if (key === 'damage' || key === 'frags') return row[key] ?? -Infinity;
+  return row[key].toLocaleLowerCase();
 }
 
 const sortedRows = computed(() =>
