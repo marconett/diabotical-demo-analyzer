@@ -13,7 +13,7 @@ use crate::extract::DemoExtract;
 
 const MAGIC: &[u8; 4] = b"SFXC";
 /// Bump whenever `DemoExtract` or the extraction rules change.
-const CACHE_VERSION: u16 = 1;
+const CACHE_VERSION: u16 = 2;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileIdentity {
@@ -184,11 +184,27 @@ mod tests {
         };
         ex.names.push((1, "alice".into()));
         ex.dmg.entry(1).or_default().push((1.5, 100));
+        ex.pov_id = Some(1);
+        ex.weapon_attempts
+            .entry(1)
+            .or_default()
+            .push(crate::extract::WeaponAttempt { ts: 2.0, weapon: 5 });
+        ex.weapon_hits
+            .entry(1)
+            .or_default()
+            .push(crate::extract::WeaponHit {
+                ts: 2.1,
+                weapon: 5,
+                damage: 7,
+            });
         assert!(cache.get(&id).is_none());
         cache.put(&id, &ex).unwrap();
         let back = cache.get(&id).unwrap();
         assert_eq!(back.names, ex.names);
         assert_eq!(back.dmg, ex.dmg);
+        assert_eq!(back.pov_id, ex.pov_id);
+        assert_eq!(back.weapon_attempts, ex.weapon_attempts);
+        assert_eq!(back.weapon_hits, ex.weapon_hits);
         let changed = FileIdentity {
             size: 11,
             ..id.clone()
